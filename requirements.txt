@@ -1,0 +1,5 @@
+## Project Requirements
+import lib_ignore_files @ git+https://github.com/bitranox/lib_ignore_files.git
+import lib_list @ git+https://github.com/bitranox/lib_list.git
+import lib_parameter @ git+https://github.com/bitranox/lib_parameter.git
+import lib_path @ git+https://github.com/bitranox/lib_path.git
