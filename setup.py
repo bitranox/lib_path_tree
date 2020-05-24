@@ -43,12 +43,6 @@ def strip_links_from_required(l_required: List[str]) -> List[str]:
     return l_req_stripped
 
 
-"""
-if is_travis_deploy():
-    required = strip_links_from_required(required)
-"""
-
-
 CLASSIFIERS = ['Development Status :: 5 - Production/Stable',
                'Intended Audience :: Developers',
                'License :: OSI Approved :: MIT License',
@@ -91,6 +85,13 @@ def get_line_data(line: str) -> str:
 tests_require = get_requirements_from_file('requirements_pytest.txt')
 install_requires = get_requirements_from_file('requirements.txt')
 setup_requires = list(set(tests_require + install_requires))
+
+"""
+# needs to be tested later for pypi deployment
+if is_travis_deploy():
+    required = strip_links_from_required(required)
+"""
+
 
 if __name__ == '__main__':
     setup(name=package_name,
