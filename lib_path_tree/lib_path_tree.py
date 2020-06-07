@@ -7,14 +7,15 @@ from typing import List
 
 # OWN
 import lib_ignore_files
-import lib_list
 import lib_parameter
 import lib_path
 
 
-def copy_files_recursive_filtered(path_source_dir: pathlib.Path, path_target_dir: pathlib.Path,
-                                  l_patterns_match: List[str] = None, l_patterns_unmatch: List[str] = None,
-                                  b_create_empty_directories: bool = True):
+def copy_files_recursive_filtered_fnmatch(path_source_dir: pathlib.Path,
+                                          path_target_dir: pathlib.Path,
+                                          l_fnmatch_patterns_match: List[str] = None,
+                                          l_fnmatch_patterns_unmatch: List[str] = None,
+                                          b_create_empty_directories: bool = True):
     """
     You can use fnmatch patterns to match and to unmatch - unmatch wins over match.
     
@@ -38,19 +39,19 @@ def copy_files_recursive_filtered(path_source_dir: pathlib.Path, path_target_dir
     >>> shutil.rmtree(str(path_target_dir),ignore_errors=True)
 
     >>> # test source does not exist
-    >>> unittest.TestCase().assertRaises(NotADirectoryError, copy_files_recursive_filtered, path_source_dir=p_bad_source_dir, path_target_dir=path_target_dir)
+    >>> unittest.TestCase().assertRaises(NotADirectoryError, copy_files_recursive_filtered_fnmatch, path_source_dir=p_bad_source_dir, path_target_dir=path_target_dir)
 
     >>> # test target dir within source dir
-    >>> unittest.TestCase().assertRaises(NotADirectoryError, copy_files_recursive_filtered, path_source_dir=path_target_dir, path_target_dir=path_test_dir)
+    >>> unittest.TestCase().assertRaises(NotADirectoryError, copy_files_recursive_filtered_fnmatch, path_source_dir=path_target_dir, path_target_dir=path_test_dir)
 
     >>> # test copy all
     >>> shutil.rmtree(str(path_target_dir),ignore_errors=True)
-    >>> copy_files_recursive_filtered(path_source_dir, path_target_dir)
+    >>> copy_files_recursive_filtered_fnmatch(path_source_dir, path_target_dir)
     >>> assert len(list(path_target_dir.rglob('*'))) == 26
 
     >>> # test copy some with match / unmatch
     >>> shutil.rmtree(str(path_target_dir),ignore_errors=True)
-    >>> copy_files_recursive_filtered(path_source_dir, path_target_dir, targets_match, targets_unmatch)
+    >>> copy_files_recursive_filtered_fnmatch(path_source_dir, path_target_dir, targets_match, targets_unmatch)
     >>> pprint.pp(sorted(list(path_target_dir.rglob('*'))))  # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     [.../tests/treecopy_test_target.dir/.hidden_match.dir'),
      .../tests/treecopy_test_target.dir/.hidden_match.dir/.hidden_test_match.file'),
@@ -63,13 +64,82 @@ def copy_files_recursive_filtered(path_source_dir: pathlib.Path, path_target_dir
 
     """
 
-    l_patterns_match = lib_parameter.get_default_if_none(l_patterns_match, default=['*'])
-    l_patterns_unmatch = lib_parameter.get_default_if_none(l_patterns_unmatch, default=[])
+    l_fnmatch_patterns_match = lib_parameter.get_default_if_none(l_fnmatch_patterns_match, default=['*'])
+    l_fnmatch_patterns_unmatch = lib_parameter.get_default_if_none(l_fnmatch_patterns_unmatch, default=[])
     path_source_dir = path_source_dir.resolve()
     path_target_dir = path_target_dir.resolve()
     lib_path.log_and_raise_if_not_isdir(path_source_dir)
     lib_path.log_and_raise_if_target_directory_within_source_directory(path_source_dir, path_target_dir)
-    l_path_sources = list_paths_recursive_filtered(path_source_dir, l_patterns_match, l_patterns_unmatch)
+    l_path_sources = list_paths_recursive_filtered_fnmatch(path_source_dir, l_fnmatch_patterns_match, l_fnmatch_patterns_unmatch)
+    # TODO IGNORE FILES
+    # l_path_ignore_files = lib_ignore_files.get_l_nomatch_from_ignore_files(path_source_dir, ignore_file_name='.rotekignore')
+    # l_path_sources = lib_list.l_substract_unsorted_fast(l_path_sources, l_path_ignore_files)
+
+    for path_source in l_path_sources:
+        path_target = pathlib.Path(str(path_source).replace(str(path_source_dir), str(path_target_dir), 1))
+        copy_path_object_with_metadata(path_source, path_target, b_create_empty_directories)
+
+
+def copy_files_recursive_filtered_glob(path_source_dir: pathlib.Path,
+                                       path_target_dir: pathlib.Path,
+                                       l_glob_patterns_match: List[str] = None,
+                                       l_glob_patterns_unmatch: List[str] = None,
+                                       b_create_empty_directories: bool = True):
+    """
+    You can use fnmatch patterns to match and to unmatch - unmatch wins over match.
+
+    ls_patterns_match: default = ['*'], Match pattern immer relativ zu source Directory - dies matched alle Files und leere Directories
+                                        ['*'] matched alles - ['*.*'] nur alle Files mit Extension !
+    ls_patterns_nomatch: default = []
+    b_create_empty_directories: leere Verzeichnisse erzeugen
+
+    :raises: NotADirectoryError when the source directory does not exist
+             RunTimeError wenn Zielverzeichnis im Quellverzeichnis (rekursive Kopie auf sich selbst)
+
+    >>> # Setup
+    >>> import unittest
+    >>> import pprint
+    >>> path_test_dir = pathlib.Path(__file__).parent.parent / 'tests'
+    >>> p_bad_source_dir = pathlib.Path('./does/not/exist')
+    >>> path_source_dir = path_test_dir / 'treecopy_test_source.dir'
+    >>> path_target_dir = path_test_dir / 'treecopy_test_target.dir'
+    >>> targets_match=['**/.hidden*/*']
+    >>> targets_unmatch=['**/*_no_match*/*', '**/*_no_match*']
+    >>> shutil.rmtree(str(path_target_dir),ignore_errors=True)
+
+    >>> # test source does not exist
+    >>> unittest.TestCase().assertRaises(NotADirectoryError, copy_files_recursive_filtered_glob, path_source_dir=p_bad_source_dir, path_target_dir=path_target_dir)
+
+    >>> # test target dir within source dir
+    >>> unittest.TestCase().assertRaises(NotADirectoryError, copy_files_recursive_filtered_glob, path_source_dir=path_target_dir, path_target_dir=path_test_dir)
+
+    >>> # test copy all
+    >>> shutil.rmtree(str(path_target_dir),ignore_errors=True)
+    >>> copy_files_recursive_filtered_fnmatch(path_source_dir, path_target_dir)
+    >>> assert len(list(path_target_dir.rglob('*'))) == 26
+
+    >>> # test copy some with match / unmatch
+    >>> shutil.rmtree(str(path_target_dir),ignore_errors=True)
+    >>> copy_files_recursive_filtered_fnmatch(path_source_dir, path_target_dir, targets_match, targets_unmatch)
+    >>> pprint.pp(sorted(list(path_target_dir.rglob('*'))))  # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    [.../tests/treecopy_test_target.dir/.hidden_match.dir'),
+     .../tests/treecopy_test_target.dir/.hidden_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_target.dir/.hidden_match.dir/test_match.file')]
+
+    >>> assert len(list(path_target_dir.rglob('*'))) == 3
+
+    >>> # Teardown
+    >>> shutil.rmtree(str(path_target_dir),ignore_errors=True)
+
+    """
+
+    l_glob_patterns_match = lib_parameter.get_default_if_none(l_glob_patterns_match, default=['**/*'])
+    l_glob_patterns_unmatch = lib_parameter.get_default_if_none(l_glob_patterns_unmatch, default=[])
+    path_source_dir = path_source_dir.resolve()
+    path_target_dir = path_target_dir.resolve()
+    lib_path.log_and_raise_if_not_isdir(path_source_dir)
+    lib_path.log_and_raise_if_target_directory_within_source_directory(path_source_dir, path_target_dir)
+    l_path_sources = list_paths_recursive_filtered_glob(path_source_dir, l_glob_patterns_match, l_glob_patterns_unmatch)
     # TODO IGNORE FILES
     # l_path_ignore_files = lib_ignore_files.get_l_nomatch_from_ignore_files(path_source_dir, ignore_file_name='.rotekignore')
     # l_path_sources = lib_list.l_substract_unsorted_fast(l_path_sources, l_path_ignore_files)
@@ -120,7 +190,9 @@ def list_dirs_recursive(path_base_dir: pathlib.Path) -> List[pathlib.Path]:
     return l_path_result
 
 
-def list_dirs_recursive_filtered(path_base_dir: pathlib.Path, l_patterns_match: List[str] = None, l_patterns_unmatch: List[str] = None) -> List[pathlib.Path]:
+def list_dirs_recursive_filtered_fnmatch(path_base_dir: pathlib.Path,
+                                         l_fnmatch_patterns_match: List[str] = None,
+                                         l_fnmatch_patterns_unmatch: List[str] = None) -> List[pathlib.Path]:
     """
 
     # TODO IGNORE FILES
@@ -143,7 +215,7 @@ def list_dirs_recursive_filtered(path_base_dir: pathlib.Path, l_patterns_match: 
     >>> path_test_dir = pathlib.Path(__file__).parent.parent / 'tests'
     >>> path_source_dir = path_test_dir / 'treecopy_test_source.dir'
 
-    >>> pp(sorted(list_dirs_recursive_filtered(path_source_dir,['*/test*'],[]))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    >>> pp(sorted(list_dirs_recursive_filtered_fnmatch(path_source_dir,['*/test*'],[]))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     [.../tests/treecopy_test_source.dir'),
      .../tests/treecopy_test_source.dir/.hidden_match.dir'),
      .../tests/treecopy_test_source.dir/.hidden_no_match.dir'),
@@ -153,7 +225,7 @@ def list_dirs_recursive_filtered(path_base_dir: pathlib.Path, l_patterns_match: 
      .../tests/treecopy_test_source.dir/test_match.dir'),
      .../tests/treecopy_test_source.dir/test_no_match.dir')]
 
-    >>> pp(sorted(list_dirs_recursive_filtered(path_source_dir,['*/test*'],['*no_match*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    >>> pp(sorted(list_dirs_recursive_filtered_fnmatch(path_source_dir,['*/test*'],['*no_match*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     [.../tests/treecopy_test_source.dir'),
      .../tests/treecopy_test_source.dir/.hidden_match.dir'),
      .../tests/treecopy_test_source.dir/test_empty.dir'),
@@ -161,7 +233,7 @@ def list_dirs_recursive_filtered(path_base_dir: pathlib.Path, l_patterns_match: 
      .../tests/treecopy_test_source.dir/test_empty2.dir/test_empty.dir'),
      .../tests/treecopy_test_source.dir/test_match.dir')]
 
-    >>> pp(sorted(list_dirs_recursive_filtered(path_source_dir,['*/test*'],['*/.hidden*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    >>> pp(sorted(list_dirs_recursive_filtered_fnmatch(path_source_dir,['*/test*'],['*/.hidden*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     [.../tests/treecopy_test_source.dir'),
      .../tests/treecopy_test_source.dir/test_empty.dir'),
      .../tests/treecopy_test_source.dir/test_empty2.dir'),
@@ -175,7 +247,7 @@ def list_dirs_recursive_filtered(path_base_dir: pathlib.Path, l_patterns_match: 
     lib_path.log_and_raise_if_not_isdir(path_base_dir)
 
     l_paths_all = list_dirs_recursive(path_base_dir)
-    l_paths_result = filter_path_objects(l_paths=l_paths_all, l_patterns_match=l_patterns_match, l_patterns_unmatch=l_patterns_unmatch)
+    l_paths_result = filter_path_objects_fnmatch(l_paths=l_paths_all, l_fnmatch_patterns_match=l_fnmatch_patterns_match, l_fnmatch_patterns_unmatch=l_fnmatch_patterns_unmatch)
 
     return l_paths_result
 
@@ -290,8 +362,11 @@ def list_paths_recursive(path_base_dir: pathlib.Path) -> List[pathlib.Path]:
     return l_path_result
 
 
-def list_paths_recursive_filtered(path_base_dir: pathlib.Path, l_patterns_match: List[str] = None, l_patterns_unmatch: List[str] = None) -> List[pathlib.Path]:
+def list_paths_recursive_filtered_fnmatch(path_base_dir: pathlib.Path,
+                                          l_fnmatch_patterns_match: List[str] = None,
+                                          l_fnmatch_patterns_unmatch: List[str] = None) -> List[pathlib.Path]:
     """
+    # patterns are glob patterns ! NOT fnmatch patterns !
 
     # TODO IGNORE FILES
     # l_path_ignore_files = lib_ignore_files.get_l_nomatch_from_ignore_files(path_source_dir, ignore_file_name='.rotekignore')
@@ -312,7 +387,7 @@ def list_paths_recursive_filtered(path_base_dir: pathlib.Path, l_patterns_match:
     >>> path_test_dir = pathlib.Path(__file__).parent.parent / 'tests'
     >>> path_source_dir = path_test_dir / 'treecopy_test_source.dir'
 
-    >>> pp(sorted(list_paths_recursive_filtered(path_source_dir,['*match*/*'],[]))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    >>> pp(sorted(list_paths_recursive_filtered_fnmatch(path_source_dir,['*match*/*'],[]))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     [.../tests/treecopy_test_source.dir/.hidden_match.dir/.hidden_test_match.file'),
      .../tests/treecopy_test_source.dir/.hidden_match.dir/.hidden_test_no_match.file'),
      .../tests/treecopy_test_source.dir/.hidden_match.dir/test_match.file'),
@@ -331,7 +406,7 @@ def list_paths_recursive_filtered(path_base_dir: pathlib.Path, l_patterns_match:
      .../tests/treecopy_test_source.dir/test_no_match.dir/test_match.file'),
      .../tests/treecopy_test_source.dir/test_no_match.dir/test_no_match.file')]
 
-    >>> pp(sorted(list_paths_recursive_filtered(path_source_dir,['*_test_*'],['*no_match*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    >>> pp(sorted(list_paths_recursive_filtered_fnmatch(path_source_dir,['*_test_*'],['*no_match*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     [.../tests/treecopy_test_source.dir/.hidden_match.dir'),
      .../tests/treecopy_test_source.dir/.hidden_match.dir/.hidden_test_match.file'),
      .../tests/treecopy_test_source.dir/.hidden_match.dir/test_match.file'),
@@ -344,7 +419,7 @@ def list_paths_recursive_filtered(path_base_dir: pathlib.Path, l_patterns_match:
      .../tests/treecopy_test_source.dir/test_match.dir/test_match.file'),
      .../tests/treecopy_test_source.dir/test_match.dir/test_match_file_noextension')]
 
-    >>> pp(sorted(list_paths_recursive_filtered(path_source_dir,['*/.hidden*/*'],['*_no_match*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    >>> pp(sorted(list_paths_recursive_filtered_fnmatch(path_source_dir,['*/.hidden*/*'],['*_no_match*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     [.../tests/treecopy_test_source.dir/.hidden_match.dir/.hidden_test_match.file'),
      .../tests/treecopy_test_source.dir/.hidden_match.dir/test_match.file')]
 
@@ -355,30 +430,114 @@ def list_paths_recursive_filtered(path_base_dir: pathlib.Path, l_patterns_match:
     lib_path.log_and_raise_if_not_isdir(path_base_dir)
 
     l_paths_all = list_paths_recursive(path_base_dir)
-    l_paths_result = filter_path_objects(l_paths=l_paths_all, l_patterns_match=l_patterns_match, l_patterns_unmatch=l_patterns_unmatch)
+    l_paths_result = filter_path_objects_fnmatch(l_paths=l_paths_all, l_fnmatch_patterns_match=l_fnmatch_patterns_match, l_fnmatch_patterns_unmatch=l_fnmatch_patterns_unmatch)
 
     return l_paths_result
 
 
-def filter_path_objects(l_paths: List[pathlib.Path], l_patterns_match: List[str] = None, l_patterns_unmatch: List[str] = None) -> List[pathlib.Path]:
+def list_paths_recursive_filtered_glob(path_base_dir: pathlib.Path,
+                                       l_glob_patterns_match: List[str] = None,
+                                       l_glob_patterns_unmatch: List[str] = None) -> List[pathlib.Path]:
+    """
+    patterns are glob patterns ! NOT fnmatch patterns !
+
+    # TODO IGNORE FILES
+    # l_path_ignore_files = lib_ignore_files.get_l_nomatch_from_ignore_files(path_source_dir, ignore_file_name='.rotekignore')
+    # l_path_sources = lib_list.l_substract_unsorted_fast(l_path_sources, l_path_ignore_files)
+
+    Directory aller Files und Verzeichnisse welche den Suchkriterien entsprechen rekursiv vom Basisverzeichnis
+    Es dürfen auch Verzeichnisnamen und Wildcards in den Filtern  verwendet werden.
+
+    ls_patterns_nomatch übersteuert ls_patterns_match
+
+    Vorsicht : ls_files_match=['*.*'] matched nur Files mit einer Extension.
+               für alle Files : ls_files_match=['*']
+
+
+    Matches / Unmatches Patterns. Patterns for directories :
+    >>> # Setup
+    >>> from pprint import pp
+    >>> path_test_dir = pathlib.Path(__file__).parent.parent / 'tests'
+    >>> path_source_dir = path_test_dir / 'treecopy_test_source.dir'
+
+    >>> pp(sorted(list_paths_recursive_filtered_glob(path_source_dir,['**/*match*'],[]))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    [.../tests/treecopy_test_source.dir/.hidden_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_match.dir/.hidden_test_no_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_match.dir/test_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_match.dir/test_no_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_no_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_no_match.dir/.hidden_test_no_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_no_match.dir/test_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_no_match.dir/test_no_match.file'),
+     .../tests/treecopy_test_source.dir/test_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/test_match.dir/.hidden_test_no_match.file'),
+     .../tests/treecopy_test_source.dir/test_match.dir/test_match.file'),
+     .../tests/treecopy_test_source.dir/test_match.dir/test_match_file_noextension'),
+     .../tests/treecopy_test_source.dir/test_match.dir/test_no_match.file'),
+     .../tests/treecopy_test_source.dir/test_no_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/test_no_match.dir/.hidden_test_no_match.file'),
+     .../tests/treecopy_test_source.dir/test_no_match.dir/test_match.file'),
+     .../tests/treecopy_test_source.dir/test_no_match.dir/test_no_match.file')]
+
+    >>> pp(sorted(list_paths_recursive_filtered_glob(path_source_dir,['**/*_test_*'],['*no_match*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    [.../tests/treecopy_test_source.dir/.hidden_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_match.dir/.hidden_test_no_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_no_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_no_match.dir/.hidden_test_no_match.file'),
+     .../tests/treecopy_test_source.dir/test_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/test_match.dir/.hidden_test_no_match.file'),
+     .../tests/treecopy_test_source.dir/test_no_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/test_no_match.dir/.hidden_test_no_match.file')]
+
+    >>> pp(sorted(list_paths_recursive_filtered_glob(path_source_dir,['**/.hidden*/*'],['**/*_no_match*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    [.../tests/treecopy_test_source.dir/.hidden_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_match.dir/test_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_no_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_no_match.dir/test_match.file')]
+
+    >>> pp(sorted(list_paths_recursive_filtered_glob(path_source_dir,['**/.hidden*/*'],['**/*_no_match*/*', '**/*_no_match*']))) # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+    [.../tests/treecopy_test_source.dir/.hidden_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_source.dir/.hidden_match.dir/test_match.file')]
+
+
+    """
+
+    path_base_dir = path_base_dir.resolve()
+    lib_path.log_and_raise_if_path_does_not_exist(path_base_dir)
+    lib_path.log_and_raise_if_not_isdir(path_base_dir)
+
+    paths_glob_matching = set()
+    for glob_pattern_match in l_glob_patterns_match:
+        paths_glob_matching.update(set(path_base_dir.glob(glob_pattern_match)))
+
+    for glob_pattern_unmatch in l_glob_patterns_unmatch:
+        paths_glob_matching = paths_glob_matching - set(path_base_dir.glob(glob_pattern_unmatch))
+
+    l_paths_result = list(paths_glob_matching)
+    return l_paths_result
+
+
+def filter_path_objects_fnmatch(l_paths: List[pathlib.Path],
+                                l_fnmatch_patterns_match: List[str] = None,
+                                l_fnmatch_patterns_unmatch: List[str] = None) -> List[pathlib.Path]:
     """
     # TODO IGNORE FILES
     # l_path_ignore_files = lib_ignore_files.get_l_nomatch_from_ignore_files(path_source_dir, ignore_file_name='.rotekignore')
     # l_path_sources = lib_list.l_substract_unsorted_fast(l_path_sources, l_path_ignore_files)
 
     """
-    l_patterns_match = lib_parameter.get_default_if_none(l_patterns_match, default=['*'])
-    l_patterns_unmatch = lib_parameter.get_default_if_none(l_patterns_unmatch, default=[])
+    l_fnmatch_patterns_match = lib_parameter.get_default_if_none(l_fnmatch_patterns_match, default=['*'])
+    l_fnmatch_patterns_unmatch = lib_parameter.get_default_if_none(l_fnmatch_patterns_unmatch, default=[])
     l_paths_match = list()
     l_paths_unmatch = list()
 
     for path_all in l_paths:
-        for pattern_match in l_patterns_match:
+        for pattern_match in l_fnmatch_patterns_match:
             if fnmatch.fnmatch(path_all, pattern_match):
                 l_paths_match.append(path_all)
 
     for path_match in l_paths_match:
-        for pattern_unmatch in l_patterns_unmatch:
+        for pattern_unmatch in l_fnmatch_patterns_unmatch:
             if fnmatch.fnmatch(path_match, pattern_unmatch):
                 l_paths_unmatch.append(path_match)
 
@@ -489,7 +648,7 @@ def remove_empty_folders_recursive(path_base_dir: pathlib.Path) -> None:
     >>> path_test_dir = pathlib.Path(__file__).parent.parent / 'tests'
     >>> path_empty_folder_test_source = path_test_dir / 'empty_folder_test_source'
     >>> path_empty_folder_test_target = path_test_dir / 'empty_folder_test_target'
-    >>> copy_files_recursive_filtered(path_empty_folder_test_source, path_empty_folder_test_target)
+    >>> copy_files_recursive_filtered_fnmatch(path_empty_folder_test_source, path_empty_folder_test_target)
 
     >>> # TEST
     >>> remove_empty_folders_recursive(path_empty_folder_test_target)
@@ -510,7 +669,7 @@ def remove_empty_folders_recursive(path_base_dir: pathlib.Path) -> None:
             path_folder.rmdir()
 
 
-def remove_folders_recursive(path_base_dir: pathlib.Path, l_patterns_match: List[str] = None, l_patterns_nomatch: List[str] = None):
+def remove_folders_recursive_fnmatch(path_base_dir: pathlib.Path, l_fnmatch_patterns_match: List[str] = None, l_fnmatch_patterns_nomatch: List[str] = None):
     """
     Löscht alle Verzeichnisse welche den Suchkriterien entsprechen rekursiv vom Basisverzeichnis aus, auch wenn diese nicht leer sind.
     Es dürfen auch Verzeichnisnamen und Wildcards in den Filtern verwendet werden. ls_patterns_nomatch übersteuert ls_patterns_match
@@ -532,14 +691,14 @@ def remove_folders_recursive(path_base_dir: pathlib.Path, l_patterns_match: List
     >>> shutil.rmtree(str(path_target_dir),ignore_errors=True)
 
     >>> # Delete all
-    >>> copy_files_recursive_filtered(path_source_dir, path_target_dir)
+    >>> copy_files_recursive_filtered_fnmatch(path_source_dir, path_target_dir)
     >>> assert len(list(path_target_dir.rglob('*'))) == 26
-    >>> remove_folders_recursive(path_target_dir)
+    >>> remove_folders_recursive_fnmatch(path_target_dir)
     >>> assert len(list(path_target_dir.rglob('*'))) == 0
     >>> assert not path_target_dir.exists()
 
     >>> # Delete "*/.hidden*" exclusive *_test_match.file
-    >>> copy_files_recursive_filtered(path_source_dir, path_target_dir)
+    >>> copy_files_recursive_filtered_fnmatch(path_source_dir, path_target_dir)
     >>> pprint.pp(sorted(list(path_target_dir.glob('**/'))))  # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     [.../tests/treecopy_test_target.dir'),
      .../tests/treecopy_test_target.dir/.hidden_match.dir'),
@@ -550,7 +709,7 @@ def remove_folders_recursive(path_base_dir: pathlib.Path, l_patterns_match: List
      .../tests/treecopy_test_target.dir/test_match.dir'),
      .../tests/treecopy_test_target.dir/test_no_match.dir')]
 
-    >>> remove_folders_recursive(path_target_dir, ['*'], ['*/.hidden*'])
+    >>> remove_folders_recursive_fnmatch(path_target_dir, ['*'], ['*/.hidden*'])
     >>> pprint.pp(sorted(list(path_target_dir.glob('**/'))))  # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     [.../tests/treecopy_test_target.dir'),
      .../tests/treecopy_test_target.dir/.hidden_match.dir'),
@@ -569,7 +728,7 @@ def remove_folders_recursive(path_base_dir: pathlib.Path, l_patterns_match: List
         raise RuntimeError('Sie wollen von "{}" alle Unterverzeichnisse löschen - zu gefährlich, Notbremse'.format(base_dir))
 
     # alle Folder die matchen dem Ergebnis hinzufügen
-    l_path_dirs = list_dirs_recursive_filtered(path_base_dir=base_dir, l_patterns_match=l_patterns_match, l_patterns_unmatch=l_patterns_nomatch)
+    l_path_dirs = list_dirs_recursive_filtered_fnmatch(path_base_dir=base_dir, l_fnmatch_patterns_match=l_fnmatch_patterns_match, l_fnmatch_patterns_unmatch=l_fnmatch_patterns_nomatch)
     l_path_dirs = sorted(l_path_dirs, reverse=True)
     for path_dir in l_path_dirs:
         if not lib_path.has_subdirs(path_dir):
