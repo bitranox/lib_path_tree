@@ -151,7 +151,7 @@ def copy_files_recursive_filtered_glob(path_source_dir: pathlib.Path,
 
 def list_dirs_recursive(path_base_dir: pathlib.Path) -> List[pathlib.Path]:
     """
-    get all files (not directories) under the base directory, recursive. Includes also dotted files in dotted directories
+    get all directories under the base directory, recursive. Includes also dotted directories
 
     >>> # Setup
     >>> # Setup
@@ -180,6 +180,7 @@ def list_dirs_recursive(path_base_dir: pathlib.Path) -> List[pathlib.Path]:
     lib_path.log_and_raise_if_not_isdir(path_base_dir)
     l_path_result = list()
 
+    # TODO : even faster should be next(os.walk(path_base_dir)[1], needs testing
     # we use os.walk because it is 3 x faster then pathlib.Path('.').rglob(*)
     # and oddly pathlib.Path('.').rglob(*) fails on windows on samba share (sometimes)
     l_path_result.append(pathlib.Path(path_base_dir))
