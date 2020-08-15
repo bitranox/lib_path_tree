@@ -6,10 +6,6 @@ import pathlib
 import shutil
 from typing import Any, Callable, Iterator, List, Optional, Set, Union
 
-# EXT
-import gitignore_parser
-import pathspec     # deprecated (?)
-
 # OWN
 import lib_parameter
 import lib_path
