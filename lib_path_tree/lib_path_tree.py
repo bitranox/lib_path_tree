@@ -7,9 +7,126 @@ import shutil
 from typing import Any, Callable, Iterator, List, Optional, Set, Union
 
 # OWN
+import igittigitt
 import lib_parameter
 import lib_path
 import pathlib3x
+
+
+def copy_tree_fnmatch_new(path_source_dir: pathlib.Path,
+                      path_target_dir: pathlib.Path,
+                      patterns_fn_match: Optional[List[str]] = None,
+                      patterns_fn_unmatch: Optional[List[str]] = None,
+                      gitignore_filenames: Optional[List[str]] = None,
+                      create_empty_directories: bool = True,
+                      threaded: bool = True):
+    """
+    copy files and directories recursively, using match/unmatch patterns
+
+
+    Parameter
+    ---------
+    path_source_dir
+        the source directory
+    path_target_dir
+        the target directory
+    patterns_fn_match
+        patterns to match, default = ['*']
+    patterns_fn_unmatch
+        patterns to unmatch, default = [] - this wins over the 'match' pattern
+    gitignore_filenames
+        a list of ignorefile names, which will be parsed recursively from the source directory
+        ignorefiles in already ignored directories will not be considered
+        default = '.gitignore'
+    create_empty_directories
+        create empty directories in target
+
+    Exceptions
+    ----------
+    NotADirectoryError
+        when the source directory does not exist
+    RunTimeError
+       if the target directory is within the source directory
+
+    Examples
+    ----------
+
+    >>> # Setup
+    >>> import unittest
+    >>> import pprint
+    >>> path_test_dir = pathlib.Path(__file__).parent.parent / 'tests'
+    >>> p_bad_source_dir = pathlib.Path('./does/not/exist')
+    >>> p_source_dir = path_test_dir / 'treecopy_test_source.dir'
+    >>> p_target_dir = path_test_dir / 'treecopy_test_target.dir'
+    >>> targets_match=['*/.hidden*/*']
+    >>> targets_unmatch=['*_no_match*']
+    >>> shutil.rmtree(str(p_target_dir),ignore_errors=True)
+
+    >>> # test source does not exist
+    >>> unittest.TestCase().assertRaises(NotADirectoryError, copy_tree_fnmatch, path_source_dir=p_bad_source_dir, path_target_dir=p_target_dir)
+
+    >>> # test target dir within source dir
+    >>> unittest.TestCase().assertRaises(NotADirectoryError, copy_tree_fnmatch, path_source_dir=p_target_dir, path_target_dir=path_test_dir)
+
+    >>> # test copy all
+    >>> shutil.rmtree(str(p_target_dir),ignore_errors=True)
+    >>> copy_tree_fnmatch(p_source_dir, p_target_dir)
+    >>> assert len(list(p_target_dir.rglob('*'))) == 26
+
+    >>> # test copy some with match / unmatch
+    >>> shutil.rmtree(str(p_target_dir),ignore_errors=True)
+    >>> copy_tree_fnmatch(p_source_dir, p_target_dir, targets_match, targets_unmatch)
+    >>> pprint.pp(sorted(list(p_target_dir.rglob('*'))))
+    [.../tests/treecopy_test_target.dir/.hidden_match.dir'),
+     .../tests/treecopy_test_target.dir/.hidden_match.dir/.hidden_test_match.file'),
+     .../tests/treecopy_test_target.dir/.hidden_match.dir/test_match.file')]
+
+    >>> assert len(list(p_target_dir.rglob('*'))) == 3
+
+    >>> # Teardown
+    >>> shutil.rmtree(str(p_target_dir),ignore_errors=True)
+
+
+    >>> import decorator_timeit
+    >>> # timeit with test directory
+    >>> result = decorator_timeit.TimeIt(repeat=100)(copy_tree_fnmatch)(p_source_dir, p_target_dir, targets_match, targets_unmatch, threaded=False)
+    >>> result2 = decorator_timeit.TimeIt(repeat=100)(copy_tree_fnmatch)(p_source_dir, p_target_dir, targets_match, targets_unmatch, threaded=True)
+
+
+    """
+
+    patterns_fn_match = lib_parameter.get_default_if_none(patterns_fn_match, default=['*'])
+    patterns_fn_unmatch = lib_parameter.get_default_if_none(patterns_fn_unmatch, default=[])
+    gitignore_filenames = lib_parameter.get_default_if_none(gitignore_filenames, default=['.gitignore'])
+    path_source_dir = path_source_dir.resolve()
+    path_target_dir = path_target_dir.resolve()
+    lib_path.log_and_raise_if_not_isdir(path_source_dir)
+    lib_path.log_and_raise_if_target_directory_within_source_directory(path_source_dir, path_target_dir)
+
+    gitignore_parser = igittigitt.IgnoreParser()
+
+
+
+
+
+
+
+
+
+
+
+
+    path_sources = get_tree_path_fnmatch(path_source_dir, patterns_fn_match, patterns_fn_unmatch)
+
+    if threaded:
+        with ThreadPoolExecutor(max_workers=2) as tp:
+            for path_source in path_sources:
+                path_target = pathlib.Path(str(path_source).replace(str(path_source_dir), str(path_target_dir), 1))
+                tp.submit(copy_path_object_with_metadata, path_source, path_target, create_empty_directories)
+    else:
+        for path_source in path_sources:
+            path_target = pathlib.Path(str(path_source).replace(str(path_source_dir), str(path_target_dir), 1))
+            copy_path_object_with_metadata(path_source, path_target, create_empty_directories)
 
 
 def copy_tree_fnmatch(path_source_dir: pathlib.Path,
@@ -96,9 +213,6 @@ def copy_tree_fnmatch(path_source_dir: pathlib.Path,
     lib_path.log_and_raise_if_not_isdir(path_source_dir)
     lib_path.log_and_raise_if_target_directory_within_source_directory(path_source_dir, path_target_dir)
     path_sources = get_tree_path_fnmatch(path_source_dir, patterns_fn_match, patterns_fn_unmatch)
-    # TODO IGNORE FILES
-    # l_path_ignore_files = lib_ignore_files.get_l_nomatch_from_ignore_files(path_source_dir, ignore_file_name='.rotekignore')
-    # l_path_sources = lib_list.l_substract_unsorted_fast(l_path_sources, l_path_ignore_files)
 
     if threaded:
         with ThreadPoolExecutor(max_workers=2) as tp:
@@ -165,11 +279,6 @@ def get_tree_dirs_fnmatch(path_base_dir: pathlib.Path,
         patterns to match, default = ['*']
     patterns_fn_unmatch
         patterns to unmatch, default = [] - this wins over the 'match' pattern
-
-
-    # TODO IGNORE FILES
-    # l_path_ignore_files = lib_ignore_files.get_l_nomatch_from_ignore_files(path_source_dir, ignore_file_name='.rotekignore')
-    # l_path_sources = lib_list.l_substract_unsorted_fast(l_path_sources, l_path_ignore_files)
 
 
     Examples
@@ -322,11 +431,6 @@ def filter_path_objects_fnmatch(paths: Union[List[pathlib.Path], Iterator[pathli
         patterns to match, default = ['*']
     patterns_fn_unmatch
         patterns to unmatch, default = [] - this wins over the 'match' pattern
-
-    # TODO IGNORE FILES
-    # l_path_ignore_files = lib_ignore_files.get_l_nomatch_from_ignore_files(path_source_dir, ignore_file_name='.rotekignore')
-    # l_path_sources = lib_list.l_substract_unsorted_fast(l_path_sources, l_path_ignore_files)
-
 
     Examples
     --------
@@ -660,98 +764,6 @@ def remove_folders_recursive_fnmatch(path_base_dir: pathlib.Path,
             shutil.rmtree(path_dir, ignore_errors=True)
 
 
-def get_gitignore_spec(path_ignore_files: List[pathlib.Path]) -> pathspec.PathSpec:
-    """
-    get the spec for all passed ignore files
-
-
-    Parameter
-    ---------
-    path_ignore_files
-        list of ignore files
-
-
-    Examples
-    --------
-
-
-    >>> # Setup
-    >>> path_test_dir = pathlib.Path(__file__).parent.parent.resolve() / 'tests/test_ignores'
-    >>> test_path_base_dir = path_test_dir
-    >>> test_ignore_file_names = ['.rotekignore']
-    >>> test_path_ignore_files = get_paths_gitignore_files(path_base_dir=test_path_base_dir, ignore_file_names=test_ignore_file_names)
-
-    >>> get_gitignore_spec(path_ignore_files=test_path_ignore_files)
-    <pathspec.pathspec.PathSpec object at ...>
-
-    """
-    spec_lines: List[str] = list()
-
-    for path_ignore_file in path_ignore_files:
-        file_spec_lines = path_ignore_file.read_text().splitlines()
-        spec_lines = spec_lines + file_spec_lines
-
-    lines_set: Set[str] = set()
-    for spec_line in spec_lines:
-        spec_line = spec_line.strip()
-        if spec_line and not spec_line.startswith('#'):
-            lines_set.add(spec_line)
-
-    spec_lines = list(lines_set)
-    spec = pathspec.PathSpec.from_lines(pathspec.patterns.GitWildMatchPattern, spec_lines)
-    return spec
-
-
-def file_matches(file: pathlib.Path, l_matches) -> bool:
-    for match in l_matches:
-        if match(str(file)):
-            return True
-    return False
-
-
-def get_gitignore_matches(path_ignore_files: List[pathlib.Path]) -> List[Callable[[str], bool]]:
-    """
-    return a match function for each ignore file
-
-    Parameter
-    ---------
-    path_ignore_files
-        a list with all ignore files
-    path_base_dir
-        Because git allows for nested .gitignore files, a base_path value
-        is required for correct behavior. The base path should be absolute.
-
-    >>> # Setup
-    >>> path_test_dir = pathlib.Path(__file__).parent.parent.resolve() / 'tests/test_ignores'
-    >>> test_path_base_dir = path_test_dir
-    >>> test_ignore_file_names = ['.rotekignore']
-    >>> test_path_ignore_files = get_paths_gitignore_files(test_path_base_dir, test_ignore_file_names)
-
-    >>> test_matches_1 = test_path_base_dir / 'dir_test1_ignore'
-    >>> test_matches_2 = test_path_base_dir / 'file1_ignore.txt'
-    >>> test_matches_3 = test_path_base_dir / 'dir_test2/dir_test2'
-    >>> test_matches_4 = test_path_base_dir / 'dir_test2/dir_test3'
-
-    >>> test_no_matches_1 = test_path_base_dir / 'dir_test2'
-    >>> test_no_matches_2 = test_path_base_dir / 'dir_test3'
-
-
-    >>> # Test
-    >>> l_matches = get_gitignore_matches(path_ignore_files=test_path_ignore_files)
-    >>> assert file_matches(test_matches_1, l_matches)
-    >>> assert file_matches(test_matches_2, l_matches)
-    >>> assert file_matches(test_matches_3, l_matches)
-    >>> assert not file_matches(test_no_matches_1, l_matches)
-    >>> assert not file_matches(test_no_matches_2, l_matches)
-
-    """
-    l_matches: List[Callable[[str], bool]] = list()
-    for path_ignore_file in path_ignore_files:
-        matches = gitignore_parser.parse_gitignore(full_path=path_ignore_file)
-        l_matches.append(matches)
-    return l_matches
-
-
 def get_paths_gitignore_files(path_base_dir: pathlib.Path, ignore_file_names: Optional[List[str]] = None) -> List[pathlib.Path]:
     """
     find and return all ignore filenames recursive under the base directory
@@ -786,3 +798,5 @@ def get_paths_gitignore_files(path_base_dir: pathlib.Path, ignore_file_names: Op
     for ignore_file_name in ignore_file_names:
         gitignore_files = gitignore_files + list(get_tree_path_fnmatch(path_base_dir, ['*/' + ignore_file_name]))
     return gitignore_files
+
+
