@@ -4,7 +4,6 @@ import fnmatch
 import os
 import pathlib
 import shutil
-import time
 from typing import Any, Callable, Iterator, List, Optional, Set, Union
 
 # OWN
@@ -15,12 +14,13 @@ import pathlib3x
 
 
 def copy_tree_fnmatch_new(path_source_dir: pathlib.Path,
-                      path_target_dir: pathlib.Path,
-                      patterns_fn_match: Optional[List[str]] = None,
-                      patterns_fn_unmatch: Optional[List[str]] = None,
-                      gitignore_filenames: Optional[List[str]] = None,
-                      create_empty_directories: bool = True,
-                      threaded: bool = True):
+                          path_target_dir: pathlib.Path,
+                          patterns_fn_match: Optional[List[str]] = None,
+                          patterns_fn_unmatch: Optional[List[str]] = None,
+                          gitignore_filenames: Optional[List[str]] = None,
+                          create_empty_directories: bool = True,
+                          threaded: bool = True):
+
     """
     copy files and directories recursively, using match/unmatch patterns
 
