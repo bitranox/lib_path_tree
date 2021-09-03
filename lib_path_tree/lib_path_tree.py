@@ -4,6 +4,7 @@ import fnmatch
 import os
 import pathlib
 import shutil
+import time
 from typing import Any, Callable, Iterator, List, Optional, Set, Union
 
 # OWN
@@ -524,6 +525,15 @@ def copy_path_object_with_metadata(path_source: pathlib.Path, path_target: pathl
     """
     copys a file object (directory of file), if possible with metadata
 
+    when copy from samba share to windows machine, some files appeared on the windows machine as directories.
+    in that case see https://askubuntu.com/questions/1288678/some-files-on-samba-shares-are-displayed-as-folders
+    delete the DOSATTRIB on the Samba Server, and probably disable them on the server :
+
+    - show samba file attributes   : sudo getfattr <filename>
+    - remove samba file attributes : sudo setfattr -x user.DOSATTRIB <filename>
+    - remove samba file attributes recursively:
+        cd <directory on the samba server>
+        find . -type f -exec setfattr -x user.DOSATTRIB "{}" \;
 
     Parameter
     ---------
@@ -561,15 +571,15 @@ def copy_path_object_with_metadata(path_source: pathlib.Path, path_target: pathl
     >>> shutil.rmtree(str(path_target_dir), ignore_errors=True)
     """
 
-    # if it is a file:
-    if path_source.is_file():
+    # if it is a directory:
+    if path_source.is_dir():
+        if copy_empty_directories:
+            pathlib3x.Path(path_target).mkdir(parents=True, exist_ok=True)
+            copy_metadata_of_path_object(path_source, path_target)
+
+    else:  # it is a file
         pathlib3x.Path(path_target).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path_source, path_target)
-
-    # crate the directory if it is not there
-    elif path_source.is_dir() and copy_empty_directories:
-        pathlib3x.Path(path_target).mkdir(parents=True, exist_ok=True)
-        copy_metadata_of_path_object(path_source, path_target)
 
 
 def expand_paths_subdirs_recursive(paths: List[pathlib.Path], expand_subdirs: bool = True) -> List[pathlib.Path]:
@@ -638,7 +648,7 @@ def copy_metadata_of_path_object(source: pathlib.Path, target: pathlib.Path) -> 
     """
     try:
         shutil.copystat(str(source), str(target))
-    except Exception:
+    except Exception:       # noqa
         pass
 
 
@@ -798,5 +808,3 @@ def get_paths_gitignore_files(path_base_dir: pathlib.Path, ignore_file_names: Op
     for ignore_file_name in ignore_file_names:
         gitignore_files = gitignore_files + list(get_tree_path_fnmatch(path_base_dir, ['*/' + ignore_file_name]))
     return gitignore_files
-
-
