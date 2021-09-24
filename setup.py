@@ -18,7 +18,7 @@ entry_points = dict()                   # type: Dict[str, List[str]]
 
 
 def get_version(dist_directory: str) -> str:
-    with open(str(pathlib.Path(__file__).parent / '{dist_directory}/version.txt'.format(dist_directory=dist_directory)), mode='r') as version_file:
+    with open(str(pathlib.Path(__file__).parent / f'{dist_directory}/version.txt'), mode='r') as version_file:
         version = version_file.readline().strip()
     return version
 

@@ -764,7 +764,7 @@ def remove_folders_recursive_fnmatch(path_base_dir: pathlib.Path,
     lib_path.log_and_raise_if_not_isdir(pathlib.Path(base_dir))
 
     if len(base_dir.parts) < minimal_depth + 1 :
-        raise RuntimeError('you want to delete subfolders from "{}" - minimal depth setting "{}" prevents that'.format(base_dir, minimal_depth))
+        raise RuntimeError(f'you want to delete subfolders from "{base_dir}" - minimal depth setting "{minimal_depth}" prevents that')
 
     # alle Folder die matchen dem Ergebnis hinzufügen
     l_path_dirs = get_tree_dirs_fnmatch(path_base_dir=base_dir, patterns_fn_match=patterns_fn_match, patterns_fn_unmatch=patterns_fn_unmatch)
