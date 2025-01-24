@@ -30,7 +30,7 @@ function install_or_update_lib_bash {
 
 install_or_update_lib_bash
 
-source /usr/local/lib_bash/lib_helpers.sh
+source /usr/local/lib_bash/lib_bash.sh
 
 function clean_caches {
     # mypy and pytest caches should be deleted, because sometimes problems on collecting if not
