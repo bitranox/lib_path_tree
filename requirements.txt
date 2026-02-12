@@ -1,4 +1,3 @@
 ## Project Requirements
 import lib_ignore_files
-import lib_parameter
 import lib_path

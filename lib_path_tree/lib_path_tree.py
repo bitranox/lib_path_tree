@@ -8,7 +8,6 @@ from typing import Any, Callable, Iterator, List, Optional, Set, Union
 
 # OWN
 import igittigitt
-import lib_parameter
 import lib_path
 import pathlib3x
 
@@ -95,10 +94,9 @@ def copy_tree_fnmatch_new(path_source_dir: pathlib.Path,
 
 
     """
-
-    patterns_fn_match = lib_parameter.get_default_if_none(patterns_fn_match, default=['*'])
-    patterns_fn_unmatch = lib_parameter.get_default_if_none(patterns_fn_unmatch, default=[])
-    gitignore_filenames = lib_parameter.get_default_if_none(gitignore_filenames, default=['.gitignore'])
+    patterns_fn_match = patterns_fn_match if patterns_fn_match is not None else ['*']
+    patterns_fn_unmatch = patterns_fn_unmatch if patterns_fn_unmatch is not None else []
+    gitignore_filenames = gitignore_filenames if gitignore_filenames is not None else ['.gitignore']
     path_source_dir = path_source_dir.resolve()
     path_target_dir = path_target_dir.resolve()
     lib_path.log_and_raise_if_not_isdir(path_source_dir)
@@ -206,9 +204,8 @@ def copy_tree_fnmatch(path_source_dir: pathlib.Path,
 
 
     """
-
-    patterns_fn_match = lib_parameter.get_default_if_none(patterns_fn_match, default=['*'])
-    patterns_fn_unmatch = lib_parameter.get_default_if_none(patterns_fn_unmatch, default=[])
+    patterns_fn_match = patterns_fn_match if patterns_fn_match is not None else ['*']
+    patterns_fn_unmatch = patterns_fn_unmatch if patterns_fn_unmatch is not None else []
     path_source_dir = path_source_dir.resolve()
     path_target_dir = path_target_dir.resolve()
     lib_path.log_and_raise_if_not_isdir(path_source_dir)
@@ -441,8 +438,8 @@ def filter_path_objects_fnmatch(paths: Union[List[pathlib.Path], Iterator[pathli
     [...Path('test.txt')]
 
     """
-    patterns_fn_match = lib_parameter.get_default_if_none(patterns_fn_match, default=['*'])
-    patterns_fn_unmatch = lib_parameter.get_default_if_none(patterns_fn_unmatch, default=[])
+    patterns_fn_match = patterns_fn_match if patterns_fn_match is not None else ['*']
+    patterns_fn_unmatch = patterns_fn_unmatch if patterns_fn_unmatch is not None else []
 
     for path in paths:
         if does_path_fnmatch_patterns(path, patterns_fn_match):
@@ -802,7 +799,7 @@ def get_paths_gitignore_files(path_base_dir: pathlib.Path, ignore_file_names: Op
 
 
     """
-    ignore_file_names = lib_parameter.get_default_if_none(ignore_file_names, ['.gitignore'])
+    ignore_file_names = ignore_file_names if ignore_file_names is not None else ['.gitignore']
 
     gitignore_files: List[pathlib.Path] = list()
     for ignore_file_name in ignore_file_names:
